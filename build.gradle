@@ -1,0 +1,80 @@
+// Minecraft 26.1 stopped being obfuscated, which split the toolchain in two: 26.x needs the
+// non-remapping Loom plugin and has no mappings, while 1.21.x and older need the remapping one with
+// Yarn. The two also disagree about the name of nearly every class in the game, so the source is
+// split as well — src/shared holds everything that never touches Minecraft, and one variant source
+// set supplies the rest.
+plugins {
+	id 'net.fabricmc.fabric-loom' version '1.17.19' apply false
+	id 'net.fabricmc.fabric-loom-remap' version '1.17.19' apply false
+	id 'maven-publish'
+}
+
+def unobfuscated = !project.minecraft_version.startsWith('1.')
+// 1.20.x predates the Click/KeyInput input records, so its screens need their own sources.
+def legacyInput = project.minecraft_version.startsWith('1.20')
+def variant = unobfuscated ? 'mc26' : (legacyInput ? 'mc120' : 'mc121')
+
+apply plugin: unobfuscated ? 'net.fabricmc.fabric-loom' : 'net.fabricmc.fabric-loom-remap'
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	mavenCentral()
+}
+
+sourceSets {
+	main {
+		java.srcDirs = ["src/shared/java", "src/${variant}/java"]
+		resources.srcDirs = ['src/main/resources']
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+
+	if (unobfuscated) {
+		// No mappings exist, and none are needed — the jar already carries real names.
+		implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+		implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+	} else {
+		mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+		modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+		modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+	}
+}
+
+processResources {
+	inputs.property "version", project.version
+	inputs.property "minecraft_version", project.minecraft_version
+	inputs.property "loader_version", project.loader_version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": project.version,
+				"minecraft_version": project.minecraft_version,
+				"loader_version": project.loader_version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	// 26.x needs a newer baseline than the 1.21.x line does.
+	it.options.release = unobfuscated ? 25 : 21
+	it.options.encoding = "UTF-8"
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(unobfuscated ? 25 : 21)
+	}
+	withSourcesJar()
+}
+
+jar {
+	from("LICENSE") {
+		rename { "${it}_${project.base.archivesName.get()}" }
+	}
+}

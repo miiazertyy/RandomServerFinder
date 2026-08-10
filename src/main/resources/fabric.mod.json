@@ -1,0 +1,27 @@
+{
+	"schemaVersion": 1,
+	"id": "randomserverfinder",
+	"version": "${version}",
+	"name": "Random Server Finder",
+	"description": "Find random public Minecraft servers to join from the multiplayer menu, with persistent filters and a smooth infinite-scrolling list. Works without any API by pinging a cached list of known server addresses.",
+	"authors": [
+		"miiazerty"
+	],
+	"contact": {
+		"homepage": "https://www.cornbread2100.com/server-scanner"
+	},
+	"license": "MIT",
+	"icon": "assets/randomserverfinder/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.serverscanner.ServerScannerMod"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=${loader_version}",
+		"minecraft": "${minecraft_version}",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

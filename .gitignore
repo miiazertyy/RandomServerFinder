@@ -1,0 +1,23 @@
+
+.gradle/
+build/
+
+dist/
+
+run/
+
+gradle.properties.bak
+
+notes.txt
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS
+.DS_Store
+Thumbs.db
