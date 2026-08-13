@@ -7,6 +7,10 @@ $ErrorActionPreference = 'Continue'
 $root = $PSScriptRoot
 $props = Join-Path $root 'gradle.properties'
 $dist = Join-Path $root 'dist'
+
+# Read rather than hardcode: the old literal kept matching a stale jar left in build\libs from an
+# earlier version, so a build could "succeed" while shipping the previous release's code.
+$modVersion = (Select-String -Path (Join-Path $root 'gradle.properties') -Pattern '^mod_version=(.+)$').Matches[0].Groups[1].Value.Trim()
 $backup = Join-Path $root 'gradle.properties.bak'
 
 # version = @(yarn, fabric-api, loader)
@@ -14,16 +18,23 @@ $backup = Join-Path $root 'gradle.properties.bak'
 # 26.x is unobfuscated and needs no mappings, so its yarn entry is unused — build.gradle picks the
 # non-remapping Loom plugin and the src/mc26 sources from the version number alone.
 #
-# 1.21.9 is the floor for the Yarn line. Below it the screen input API is different: 1.21.9 replaced
-# mouseClicked(double, double, int) with mouseClicked(Click, boolean), and the same for dragging,
-# releasing and key presses. Those are overrides, so their signatures have to match at compile time;
-# no amount of reflection bridges them. Supporting 1.21.8 and older needs a third source variant.
+# Four source trees cover this list, picked by build.gradle from the version number alone:
+#
+#   src/mc26   26.x, unobfuscated
+#   src/mc121  1.21.9 and later, where mouseClicked takes a Click rather than three doubles
+#   src/mc120  1.20.2 through 1.21.8
+#   src/mc1201 1.20.1 only, which predates ServerInfo.Status, drawGuiTexture, the four-argument
+#              mouseScrolled and the multiplayer screen packages
+#
+# Those differences are overrides and enum constants, so their shapes have to match at compile time;
+# no amount of reflection bridges them, which is why the trees exist at all.
 $targets = [ordered]@{
     '26.2'    = @('unused', '0.156.0+26.2', '0.19.3')
+    '26.1.2'  = @('unused', '0.155.2+26.1.2', '0.19.3')
     '1.21.11' = @('1.21.11+build.6', '0.141.6+1.21.11', '0.19.3')
-    '1.21.10' = @('1.21.10+build.3', '0.138.4+1.21.10', '0.19.3')
-    '1.21.9'  = @('1.21.9+build.1', '0.134.1+1.21.9', '0.19.3')
+    '1.21.1'  = @('1.21.1+build.3', '0.116.15+1.21.1', '0.16.14')
     '1.20.6'  = @('1.20.6+build.3', '0.100.8+1.20.6', '0.15.11')
+    '1.20.1'  = @('1.20.1+build.10', '0.92.11+1.20.1', '0.15.11')
 }
 
 # Only build the versions named on the command line, if any.
@@ -51,11 +62,12 @@ try {
         $text = $text -replace 'fabric_version=.*', "fabric_version=$api"
         [IO.File]::WriteAllText($props, $text)
 
+        Remove-Item (Join-Path $root 'build\libs\*.jar') -Force -ErrorAction SilentlyContinue
         & (Join-Path $root 'gradlew.bat') build --quiet -p $root 2>&1 | Out-Null
 
-        $jar = Join-Path $root "build\libs\randomserverfinder-1.0.0.jar"
+        $jar = Join-Path $root "build\libs\randomserverfinder-$modVersion.jar"
         if ($LASTEXITCODE -eq 0 -and (Test-Path $jar)) {
-            Copy-Item $jar (Join-Path $dist "randomserverfinder-1.0.0-mc$version.jar") -Force
+            Copy-Item $jar (Join-Path $dist "randomserverfinder-$modVersion-mc$version.jar") -Force
             Write-Host "    OK"
             $succeeded += $version
         }

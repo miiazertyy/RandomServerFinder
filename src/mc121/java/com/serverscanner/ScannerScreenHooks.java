@@ -1,5 +1,6 @@
 package com.serverscanner;
 
+import com.serverscanner.screen.AutoJoinQueueScreen;
 import com.serverscanner.screen.ServerScannerScreen;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
@@ -127,6 +128,7 @@ public final class ScannerScreenHooks {
 	 */
 	private static final String FINDER_LABEL = "Random Server Finder";
 	private static final String STOP_LABEL = "Stop auto-join";
+	private static final String QUEUE_LABEL = "Queue";
 
 	private static float hoverAmount;
 	private static long lastNanos;
@@ -217,10 +219,24 @@ public final class ScannerScreenHooks {
 						.build());
 			}
 
-			// The countdown, under the button. A refusal screen is completely still, so without
-			// something ticking there is no way to tell waiting from having quietly stopped.
+			// What is coming up next, and the chance to change it. Reachable from wherever a refusal
+			// left you, which is the moment you actually want to skip past whatever is queued —
+			// except on the queue screen itself, where it would only reopen what is already up.
+			if (!(screen instanceof AutoJoinQueueScreen)
+					&& findByLabel(Screens.getButtons(screen), QUEUE_LABEL) == null) {
+				Screens.getButtons(screen).add(ButtonWidget
+						.builder(Text.literal(QUEUE_LABEL),
+								b -> client.setScreen(new AutoJoinQueueScreen(screen)))
+						.dimensions(6, MARGIN + 24, 110, 20)
+						.tooltip(Tooltip.of(Text.translatable("randomserverfinder.tip.see_what_is_lined_up")))
+						.build());
+			}
+
+			// The countdown, under both buttons rather than wedged between them. A refusal screen is
+			// completely still, so without something ticking there is no way to tell waiting from
+			// having quietly stopped.
 			ScreenEvents.afterRender(screen).register((rendered, context, mouseX, mouseY, delta) ->
-					drawStatus(context, client, MARGIN, MARGIN + 24));
+					drawStatus(context, client, MARGIN, MARGIN + 48));
 		});
 	}
 

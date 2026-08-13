@@ -97,5 +97,12 @@
   "randomserverfinder.lock_the_party": "パーティーをロック",
   "randomserverfinder.need_public_ip": "ポート %s を開放したグローバルIPが必要です。",
   "randomserverfinder.and_n_more": "ほか %s 人",
-  "randomserverfinder.checking_address": "%s を確認中..."
+  "randomserverfinder.checking_address": "%s を確認中...",
+  "randomserverfinder.join_the_party": "参加",
+  "randomserverfinder.tip.join_the_server_the_party": "パーティーがいるサーバーに参加します。",
+  "randomserverfinder.auto_join_queue": "自動参加キュー",
+  "randomserverfinder.queue_empty": "まだキューは空です。検索は続いています。",
+  "randomserverfinder.queue_hint": "%s 件が待機中。行をドラッグで並べ替え、×で削除します。",
+  "randomserverfinder.queue_hint_empty": "自動参加が順に試すサーバー",
+  "randomserverfinder.tip.see_what_is_lined_up": "次に試すサーバーを確認し、順番を変更します。"
 }

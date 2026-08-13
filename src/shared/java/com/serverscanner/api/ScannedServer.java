@@ -40,6 +40,13 @@ public class ScannedServer {
 	 */
 	public transient Object resolved;
 
+	/**
+	 * How that ping ended, where the version cannot record it on the ping result itself. 1.20.1's
+	 * server info has no status field, so its source tree writes its own value here and reads it
+	 * back when the row is built. Untyped and unused on every other version.
+	 */
+	public transient Object pingState;
+
 	public static class Version {
 		public String name;
 		public int protocol;

@@ -173,12 +173,12 @@ public class FilterScreen extends Screen {
 							+ "Random servers are usually someone's home machine, and putting one on stream\n"
 							+ "tends to get it griefed. Joining and Direct Connect still work normally.",
 					() -> config.streamerMode, v -> config.streamerMode = v);
-			toggle(fieldX, FilterIcons.SUBNET, "randomserverfinder.nearby_ports", "After finding a server, look at a few ports either side on that\n"
+			toggle(fieldX, FilterIcons.NEARBY_PORTS, "randomserverfinder.nearby_ports", "After finding a server, look at a few ports either side on that\n"
 							+ "same machine. People who run one often run several, and the published\n"
 							+ "lists miss plenty of them.\n"
 							+ "This is port scanning from your connection, so it is off by default.",
 					() -> config.probeNeighbourPorts, v -> config.probeNeighbourPorts = v);
-			toggle(fieldX, FilterIcons.VANILLA, "randomserverfinder.bedrock_servers", "Also look for Bedrock Edition servers, about 30,000 more.\n"
+			toggle(fieldX, FilterIcons.BEDROCK, "randomserverfinder.bedrock_servers", "Also look for Bedrock Edition servers, about 30,000 more.\n"
 							+ "Joining one needs ViaFabricPlus signed in to a Bedrock account:\n"
 							+ "without that they are found and listed, but not playable.\n",
 					() -> config.includeBedrock, v -> config.includeBedrock = v);
@@ -390,12 +390,16 @@ public class FilterScreen extends Screen {
 
 		// Header.
 		context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 12, 0xFFFFFFFF);
-		int active = filters.activeCount();
-		String subtitle = active == 0
-				? "Same filters as the website, saved automatically"
-				: active + (active == 1 ? " filter active" : " filters active");
-		context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(subtitle),
-				this.width / 2, 24, active == 0 ? SUBTITLE : SECTION_TEXT);
+		// The filter count belongs to the filter page. On Settings it counted something that
+		// is not on screen there, so that header is just the title.
+		if (page == Page.FILTERS) {
+			int active = filters.activeCount();
+			String subtitle = active == 0
+					? "Same filters as the website, saved automatically"
+					: active + (active == 1 ? " filter active" : " filters active");
+			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(subtitle),
+					this.width / 2, 24, active == 0 ? SUBTITLE : SECTION_TEXT);
+		}
 
 		context.enableScissor(px + 1, top + 1, px + PANEL_WIDTH - 1, bottom - 1);
 		renderItems(context, mouseX, mouseY, px, top, bottom);

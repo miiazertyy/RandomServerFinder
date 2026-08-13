@@ -3,6 +3,7 @@ package com.serverscanner.compat;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 
 /**
  * Small drawing helpers that 26.x does not provide directly.
@@ -20,6 +21,12 @@ public final class Draw {
 	}
 
 	public static void centered(GuiGraphicsExtractor context, Font font, String text,
+			int centreX, int y, int colour) {
+		context.text(font, text, centreX - font.width(text) / 2, y, colour);
+	}
+
+	/** One line of already-wrapped text, whose styling is baked in. */
+	public static void centered(GuiGraphicsExtractor context, Font font, FormattedCharSequence text,
 			int centreX, int y, int colour) {
 		context.text(font, text, centreX - font.width(text) / 2, y, colour);
 	}

@@ -7,6 +7,7 @@ import com.serverscanner.local.LocalServerFeed;
 import com.serverscanner.local.ScannerSession;
 import com.serverscanner.local.ViaFabricPlusBridge;
 import com.serverscanner.party.PartyManager;
+import com.serverscanner.screen.AutoJoinQueueScreen;
 import com.serverscanner.screen.ServerScannerScreen;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -22,6 +23,7 @@ import net.minecraft.network.ClientConnection;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -48,6 +50,14 @@ public final class AutoJoin {
 	/** Addresses tried since the last successful join, so it works through the list. */
 	private static final Set<String> tried = new HashSet<>();
 
+	/**
+	 * Servers lined up to try, front first.
+	 *
+	 * <p>Kept explicitly rather than picked at random each time so that it can be shown, reordered
+	 * and pruned. Only ever touched on the client thread, by the tick below or by its screen.
+	 */
+	private static final List<ScannedServer> queue = new ArrayList<>();
+
 	private static boolean active;
 
 	/**
@@ -59,6 +69,19 @@ public final class AutoJoin {
 	private static boolean waitingForCandidates;
 
 	private static long lastAttemptAt;
+
+	/**
+	 * The queue screen, while it is the one being used.
+	 *
+	 * <p>Every attempt replaces whatever is on screen, first with the connecting screen and then
+	 * with whatever refused you, so browsing the queue meant reopening it after every single try.
+	 * While this is set, that screen is put back as soon as an attempt is done with.
+	 *
+	 * <p>The instance is kept rather than a flag: rebuilding the screen each time would drop the
+	 * scroll position and the row icons, so the list would jump back to the top after every attempt
+	 * — which is exactly the interruption this is meant to remove.
+	 */
+	private static AutoJoinQueueScreen queueScreen;
 	private static int attempts;
 	private static String target;
 
@@ -136,13 +159,16 @@ public final class AutoJoin {
 		lastAttemptAt = 0L;
 		target = null;
 		tried.clear();
+		queue.clear();
 	}
 
 	public static void stop() {
 		active = false;
 		pending = null;
 		waitingForCandidates = false;
+		queueScreen = null;
 		tried.clear();
+		queue.clear();
 	}
 
 	/**
@@ -208,6 +234,8 @@ public final class AutoJoin {
 
 		// In a world, so this attempt worked. Now, and only now, is it worth remembering.
 		if (client.world != null) {
+			// In a world, so nothing is browsing anything; leaving here should not reopen the queue.
+			queueScreen = null;
 			if (pending != null) {
 				JoinedServers.get().record(pending.address(), nameOf(pending), pending.versionName());
 				pending = null;
@@ -229,6 +257,13 @@ public final class AutoJoin {
 		// would be written to the join history the next time a world was entered by any route at
 		// all, marking a server you were turned away from as one you had played on.
 		pending = null;
+
+		// Straight back to the queue, if that is where you were. The refusal screen has served its
+		// purpose by the time the next countdown is running, and clicking Queue again after every
+		// attempt is the whole reason this exists.
+		if (queueScreen != null && client.currentScreen != queueScreen) {
+			client.setScreen(queueScreen);
+		}
 
 		long now = System.currentTimeMillis();
 		if (now - lastAttemptAt < delayMillis()) return;
@@ -255,8 +290,20 @@ public final class AutoJoin {
 		return Math.max(MIN_DELAY_SECONDS, Math.min(MAX_DELAY_SECONDS, seconds)) * 1000L;
 	}
 
-	/** A server that has answered a ping and has not been tried yet on this run. */
+	/** The next server to try, taken off the front of the queue. */
 	private static ScannedServer pick() {
+		refill();
+		return queue.isEmpty() ? null : queue.remove(0);
+	}
+
+	/**
+	 * Tops the queue up from the search, leaving what is already in it alone.
+	 *
+	 * <p>Newly found servers are shuffled before they are appended, so two people running this do
+	 * not work through the same addresses in the same order. Everything already queued keeps its
+	 * place, which is what makes reordering by hand stick rather than being undone a second later.
+	 */
+	private static void refill() {
 		LocalServerFeed feed = ScannerSession.feed();
 		List<ScannedServer> found = feed.getServers();
 
@@ -265,23 +312,89 @@ public final class AutoJoin {
 		// all tried there is nothing left to pick and the run stalls in silence.
 		feed.maybeLoadMore(found.size());
 
-		if (found.isEmpty()) return null;
+		if (found.isEmpty()) return;
 
 		ScannerConfig config = ScannerConfig.get();
-		List<ScannedServer> candidates = new ArrayList<>();
+		Set<String> already = new HashSet<>();
+		for (ScannedServer queued : queue) already.add(queued.key());
+
+		List<ScannedServer> fresh = new ArrayList<>();
 		for (ScannedServer server : found) {
-			if (tried.contains(server.key())) continue;
+			if (tried.contains(server.key()) || already.contains(server.key())) continue;
 			if (config.hideJoined && JoinedServers.get().hasJoined(server.address())) continue;
-			candidates.add(server);
+			fresh.add(server);
 		}
 
-		if (candidates.isEmpty()) {
-			// Everything found so far has been refused. Forget the run and let the search, which is
-			// still going in the background, offer them again alongside whatever it turns up next.
-			tried.clear();
-			return null;
+		if (fresh.isEmpty()) {
+			// Everything found so far has been refused, and there is nothing waiting. Forget the run
+			// and let the search, still going in the background, offer them again alongside whatever
+			// it turns up next.
+			if (queue.isEmpty()) tried.clear();
+			return;
 		}
-		return candidates.get(RANDOM.nextInt(candidates.size()));
+
+		Collections.shuffle(fresh, RANDOM);
+		queue.addAll(fresh);
+	}
+
+	// --- The queue, as the queue screen sees it --------------------------------------------
+
+	/**
+	 * The servers lined up, in the order they will be tried.
+	 *
+	 * <p>Topped up first, so opening the screen early does not show an empty list while the search
+	 * has results sitting there unclaimed.
+	 */
+	public static List<ScannedServer> queued() {
+		if (active) refill();
+		return List.copyOf(queue);
+	}
+
+	/**
+	 * Remembers the queue screen, so attempts can hand it back afterwards.
+	 *
+	 * <p>Called with the screen when it opens and with null when it is left on purpose. Auto-join
+	 * itself is untouched by this: it keeps trying servers at exactly the same rate either way.
+	 */
+	public static void setBrowsingQueue(AutoJoinQueueScreen screen) {
+		queueScreen = screen;
+	}
+
+	public static int queueSize() {
+		return queue.size();
+	}
+
+	/**
+	 * Drops a queued server and does not offer it again.
+	 *
+	 * <p>Marked as tried rather than merely removed: it is still sitting in the search results, so
+	 * the next top-up would put it straight back.
+	 *
+	 * <p>Named rather than numbered, here and in {@link #moveQueued}, because the screen works from
+	 * a snapshot: auto-join can take the front of the queue while that screen is open, and every
+	 * index the snapshot holds is then off by one.
+	 */
+	public static void removeQueued(String key) {
+		int index = indexOf(key);
+		if (index < 0) return;
+		tried.add(queue.remove(index).key());
+	}
+
+	/** Moves a queued server to another position, for drag-to-reorder. */
+	public static void moveQueued(String key, int to) {
+		int from = indexOf(key);
+		if (from < 0) return;
+
+		int target = Math.max(0, Math.min(queue.size() - 1, to));
+		if (target == from) return;
+		queue.add(target, queue.remove(from));
+	}
+
+	private static int indexOf(String key) {
+		for (int i = 0; i < queue.size(); i++) {
+			if (queue.get(i).key().equals(key)) return i;
+		}
+		return -1;
 	}
 
 	private static void connect(MinecraftClient client, ScannedServer server) {

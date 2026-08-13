@@ -2,6 +2,7 @@ package com.serverscanner.screen;
 
 import com.serverscanner.config.ScannerConfig;
 import com.serverscanner.party.PartyManager;
+import com.serverscanner.party.PartyTravel;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
@@ -91,11 +92,23 @@ public class PartyScreen extends Screen {
 						.bounds(centre + 2, this.height - 76, 98, 20).build());
 			}
 
+			// Somewhere to go back to. A member who leaves the server lands in the menus with no way
+			// back, because the host only announces a trip when they move, not while they sit still.
+			String at = PartyManager.getHostServer();
+			Button rejoin = addRenderableWidget(Button.builder(Component.translatable("randomserverfinder.join_the_party"),
+							b -> {
+								String where = PartyManager.getHostServer();
+								if (where != null) PartyTravel.connect(this.minecraft, where);
+							})
+					.tooltip(Tooltip.create(Component.translatable("randomserverfinder.tip.join_the_server_the_party")))
+					.bounds(centre - 100, this.height - 52, 98, 20).build());
+			rejoin.active = at != null && this.minecraft.level == null;
+
 			addRenderableWidget(Button.builder(Component.translatable("randomserverfinder.leave_party"), b -> {
 						PartyManager.leave();
 						this.rebuildWidgets();
 					})
-					.bounds(centre - 100, this.height - 52, 200, 20).build());
+					.bounds(centre + 2, this.height - 52, 98, 20).build());
 		} else {
 			addRenderableWidget(Button.builder(Component.translatable("randomserverfinder.host_a_party"), b -> {
 						PartyManager.startHosting(config.partyPort);

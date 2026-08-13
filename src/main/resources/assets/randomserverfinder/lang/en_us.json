@@ -97,5 +97,12 @@
   "randomserverfinder.lock_the_party": "Lock the party",
   "randomserverfinder.need_public_ip": "need your public IP with port %s forwarded.",
   "randomserverfinder.and_n_more": "and %s more",
-  "randomserverfinder.checking_address": "Checking %s..."
+  "randomserverfinder.checking_address": "Checking %s...",
+  "randomserverfinder.join_the_party": "Join",
+  "randomserverfinder.tip.join_the_server_the_party": "Join the server the party is on.",
+  "randomserverfinder.auto_join_queue": "Auto-join queue",
+  "randomserverfinder.queue_empty": "Nothing queued yet. The search is still running.",
+  "randomserverfinder.queue_hint": "%s lined up. Drag a row to reorder, or click the cross to drop it.",
+  "randomserverfinder.queue_hint_empty": "Servers auto-join will try, in order",
+  "randomserverfinder.tip.see_what_is_lined_up": "See what is lined up next, and change the order."
 }

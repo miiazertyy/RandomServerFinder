@@ -1,9 +1,12 @@
-# Random Server Finder
+# 🎲 Random Server Finder
 
 A Fabric client mod that adds a dice button to the bottom-left of the multiplayer screen. It opens a list of random public Minecraft servers you can join.
 
 It uses **no API and no account**. It works from a bundled list of ~190,000 server addresses and
 pings them itself, so everything it shows is verified online right now.
+
+### Need help?
+If you need help or wanna request a feature, [click here](https://github.com/miiazertyy/RandomServerFinder/issues/new) to make a New issue! There's never any dumb questions.
 
 Requires [Fabric API](https://modrinth.com/mod/fabric-api).
 
@@ -16,8 +19,8 @@ Requires [Fabric API](https://modrinth.com/mod/fabric-api).
 >
 > Client-side only; nothing needed on the servers you join. Treat it as part of the setup.
 
-<img src="https://i.imgur.com/86Ca3TM.png" width="200">
-<img src="https://i.imgur.com/3mikX8z.png" width="600">
+<img src="https://i.imgur.com/86Ca3TM.png" width="200" alt="Dice button">
+<img src="https://i.imgur.com/3mikX8z.png" width="600" alt="Random server finder menu">
 
 ---
 
@@ -114,8 +117,3 @@ filters are applied before pinging, so they cost nothing.
 **Some servers can't be found.** Anything behind a hostname-routed proxy (Aternos, Minehut, Falix,
 anything on Cloudflare) is unreachable by IP and impossible to discover by scanning. Use **Direct**
 if you already know the hostname.
-
-**Where the list comes from.** The address list is published by
-[cornbread2100's scanner](https://github.com/kgurchiek/Minecraft-Server-Scanner). A copy ships inside
-the jar, and a fresh one is cached to `config/` every 12 hours. Point `ipsListPath` in
-`config/randomserverfinder.json` at your own file to use a different one.

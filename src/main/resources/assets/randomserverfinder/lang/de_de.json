@@ -97,5 +97,12 @@
   "randomserverfinder.tip.keep_trying_random_servers": "Zufällige Server durchprobieren, bis einer dich hereinlässt.\nDie meisten lehnen ab: Whitelists, Banns, Mods, volle Server.\nLäuft weiter, wenn du einen Server verlässt, bis du Stopp drückst.",
   "randomserverfinder.need_public_ip": "deine öffentliche IP mit weitergeleitetem Port %s.",
   "randomserverfinder.and_n_more": "und %s weitere",
-  "randomserverfinder.checking_address": "Prüfe %s ..."
+  "randomserverfinder.checking_address": "Prüfe %s ...",
+  "randomserverfinder.join_the_party": "Beitreten",
+  "randomserverfinder.tip.join_the_server_the_party": "Dem Server beitreten, auf dem die Gruppe ist.",
+  "randomserverfinder.auto_join_queue": "Auto-Beitritt-Warteschlange",
+  "randomserverfinder.queue_empty": "Noch nichts in der Warteschlange. Die Suche läuft weiter.",
+  "randomserverfinder.queue_hint": "%s in der Warteschlange. Zum Umsortieren ziehen, zum Entfernen auf das Kreuz klicken.",
+  "randomserverfinder.queue_hint_empty": "Server, die der Auto-Beitritt der Reihe nach versucht",
+  "randomserverfinder.tip.see_what_is_lined_up": "Zeigt, was als Nächstes kommt, und ändert die Reihenfolge."
 }

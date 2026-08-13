@@ -24,6 +24,9 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.ServerList;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
+import net.minecraft.util.FormattedCharSequence;
+
+import java.util.List;
 
 /**
  * The finder: a scrolling list of random servers that are online right now, with the controls along
@@ -38,6 +41,10 @@ public class ServerScannerScreen extends Screen {
 	/** First line below the title and status, where the optional header rows begin. */
 	private static final int HEADER_BASE = 34;
 	private static final int FOOTER_HEIGHT = 58;
+
+	/** Height of one wrapped line of the check result, and how many of them are ever drawn. */
+	private static final int CHECK_LINE = 10;
+	private static final int CHECK_MAX_LINES = 2;
 
 	/** Tall enough for the ten-pixel pictograms with a little room above and below. */
 	private static final int CHIP_HEIGHT = 14;
@@ -186,8 +193,28 @@ public class ServerScannerScreen extends Screen {
 	/** Positioned every frame, because a party line or a chip can appear while the screen is open. */
 	private void layoutList() {
 		int top = listTop();
-		list.setBounds(20, top, this.width - 40,
-				Math.max(40, this.height - top - FOOTER_HEIGHT));
+		// The check result used to be drawn eleven pixels above this edge, which put it on top of the
+		// last row rather than under the list. The list gives up that strip instead.
+		int bottom = this.height - FOOTER_HEIGHT - checkHeight();
+		list.setBounds(20, top, this.width - 40, Math.max(40, bottom - top));
+	}
+
+	/** Vertical space the check result needs, zero when there is nothing to report. */
+	private int checkHeight() {
+		int lines = checkLines().size();
+		return lines == 0 ? 0 : lines * CHECK_LINE + 3;
+	}
+
+	/**
+	 * The check result, wrapped to the screen.
+	 *
+	 * <p>Reasons run to a full sentence, so one line ran off both edges. Two is enough for every
+	 * message the check produces and keeps the list from shrinking noticeably.
+	 */
+	private List<FormattedCharSequence> checkLines() {
+		if (checkResult == null) return List.of();
+		List<FormattedCharSequence> lines = this.font.split(checkResult, this.width - 60);
+		return lines.size() <= CHECK_MAX_LINES ? lines : lines.subList(0, CHECK_MAX_LINES);
 	}
 
 	private Component autoJoinText() {
@@ -308,9 +335,10 @@ public class ServerScannerScreen extends Screen {
 		layoutList();
 		list.render(context, mouseX, mouseY);
 
-		if (checkResult != null) {
-			com.serverscanner.compat.Draw.centered(context, this.font, checkResult,
-					this.width / 2, this.height - FOOTER_HEIGHT - 11, 0xFFFFFFFF);
+		int checkY = this.height - FOOTER_HEIGHT - checkHeight() + 3;
+		for (FormattedCharSequence line : checkLines()) {
+			com.serverscanner.compat.Draw.centered(context, this.font, line, this.width / 2, checkY, 0xFFFFFFFF);
+			checkY += CHECK_LINE;
 		}
 
 		String error = feed.getError();
@@ -431,14 +459,13 @@ public class ServerScannerScreen extends Screen {
 			sb.append("  •  ").append(String.format("%,d", feed.checkedCount()))
 					.append(" of ").append(String.format("%,d", total)).append(" checked");
 		}
+		// Nothing when the search is merely paused: it stops once it has enough to fill the list and
+		// starts again the moment you scroll, so saying so was a running commentary on something
+		// that needs no attention.
 		if (feed.isLoading()) {
 			sb.append("  •  searching...");
 		} else if (feed.isExhausted()) {
 			sb.append("  •  every address checked");
-		} else {
-			// It stops once it has enough to fill the list and stays stopped until you scroll, which
-			// looks identical to being stuck. Saying so is the difference.
-			sb.append("  •  paused, scroll for more");
 		}
 		return Component.literal(sb.toString());
 	}

@@ -11,8 +11,17 @@ plugins {
 
 def unobfuscated = !project.minecraft_version.startsWith('1.')
 // 1.20.x predates the Click/KeyInput input records, so its screens need their own sources.
-def legacyInput = project.minecraft_version.startsWith('1.20')
-def variant = unobfuscated ? 'mc26' : (legacyInput ? 'mc120' : 'mc121')
+// Versions still on mouseClicked(double, double, int) rather than the Click record 1.21.9
+// introduced. Listed rather than matched on a prefix, because '1.21.1' is a prefix of
+// '1.21.11', which is on the new API.
+def legacyInput = ['1.20.6', '1.21.1'].contains(project.minecraft_version)
+// 1.20.1 predates ServerInfo.Status, drawGuiTexture and the moved screen packages.
+def oldest = project.minecraft_version == '1.20.1'
+def variant = unobfuscated ? 'mc26' : (oldest ? 'mc1201' : (legacyInput ? 'mc120' : 'mc121'))
+
+// Whatever Java the target ships with. Building 1.20.1 at 21 produced class files its own runtime
+// refuses to load, so the mod installed and then failed at launch with an UnsupportedClassVersionError.
+def javaRelease = unobfuscated ? 25 : (oldest ? 17 : 21)
 
 apply plugin: unobfuscated ? 'net.fabricmc.fabric-loom' : 'net.fabricmc.fabric-loom-remap'
 
@@ -52,22 +61,24 @@ processResources {
 	inputs.property "version", project.version
 	inputs.property "minecraft_version", project.minecraft_version
 	inputs.property "loader_version", project.loader_version
+	inputs.property "java_version", javaRelease
 
 	filesMatching("fabric.mod.json") {
 		expand "version": project.version,
 				"minecraft_version": project.minecraft_version,
-				"loader_version": project.loader_version
+				"loader_version": project.loader_version,
+				"java_version": javaRelease
 	}
 }
 
 tasks.withType(JavaCompile).configureEach {
-	// 26.x needs a newer baseline than the 1.21.x line does.
-	it.options.release = unobfuscated ? 25 : 21
+	it.options.release = javaRelease
 	it.options.encoding = "UTF-8"
 }
 
 java {
 	toolchain {
+		// One toolchain compiles them all; release above is what decides the bytecode level.
 		languageVersion = JavaLanguageVersion.of(unobfuscated ? 25 : 21)
 	}
 	withSourcesJar()

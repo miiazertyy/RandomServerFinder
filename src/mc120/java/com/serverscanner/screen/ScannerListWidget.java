@@ -59,21 +59,21 @@ public class ScannerListWidget {
 	/** Below this distance the animation is finished, avoiding an endless asymptote. */
 	private static final double SNAP_EPSILON = 0.05;
 
-	private static final Identifier INCOMPATIBLE_TEXTURE = new Identifier("server_list/incompatible");
-	private static final Identifier UNREACHABLE_TEXTURE = new Identifier("server_list/unreachable");
+	private static final Identifier INCOMPATIBLE_TEXTURE = Ids.of("server_list/incompatible");
+	private static final Identifier UNREACHABLE_TEXTURE = Ids.of("server_list/unreachable");
 	private static final Identifier[] PING_TEXTURES = {
-			new Identifier("server_list/ping_1"),
-			new Identifier("server_list/ping_2"),
-			new Identifier("server_list/ping_3"),
-			new Identifier("server_list/ping_4"),
-			new Identifier("server_list/ping_5"),
+			Ids.of("server_list/ping_1"),
+			Ids.of("server_list/ping_2"),
+			Ids.of("server_list/ping_3"),
+			Ids.of("server_list/ping_4"),
+			Ids.of("server_list/ping_5"),
 	};
 	private static final Identifier[] PINGING_TEXTURES = {
-			new Identifier("server_list/pinging_1"),
-			new Identifier("server_list/pinging_2"),
-			new Identifier("server_list/pinging_3"),
-			new Identifier("server_list/pinging_4"),
-			new Identifier("server_list/pinging_5"),
+			Ids.of("server_list/pinging_1"),
+			Ids.of("server_list/pinging_2"),
+			Ids.of("server_list/pinging_3"),
+			Ids.of("server_list/pinging_4"),
+			Ids.of("server_list/pinging_5"),
 	};
 
 	private static final int COLOR_TEXT = 0xFFFFFFFF;
@@ -112,6 +112,14 @@ public class ScannerListWidget {
 	private int lastBuiltServerCount = -1;
 	private boolean lastBuiltHideOffline;
 
+	/**
+	 * Whether "hide joined" and "hide unreachable" apply to this list.
+	 *
+	 * <p>Off for the join history, where every row is by definition a server you have joined, so
+	 * leaving the filter on emptied the screen completely.
+	 */
+	private boolean applyListFilters = true;
+
 	/** Invoked when a row is double-clicked. */
 	private java.util.function.Consumer<ScannerEntry> onJoin;
 
@@ -119,6 +127,12 @@ public class ScannerListWidget {
 		this.feed = feed;
 		this.config = config;
 		this.lastFrameNanos = System.nanoTime();
+	}
+
+	/** Turns off the two list filters, for a list that is not a search. */
+	public void setApplyListFilters(boolean apply) {
+		this.applyListFilters = apply;
+		this.lastBuiltServerCount = -1;
 	}
 
 	public void setOnJoin(java.util.function.Consumer<ScannerEntry> onJoin) {
@@ -400,7 +414,7 @@ public class ScannerListWidget {
 		return (age / 86400) + "d ago";
 	}
 
-	private Identifier statusTexture(ScannerEntry entry, int index) {
+	static Identifier statusTexture(ScannerEntry entry, int index) {
 		ServerInfo info = entry.getServerInfo();
 		return switch (info.getStatus()) {
 			case INITIAL -> PING_TEXTURES[0];
@@ -648,7 +662,7 @@ public class ScannerListWidget {
 	private void rebuildVisibleEntries() {
 		List<ScannedServer> servers = feed.getServers();
 
-		boolean filterActive = config.hideOffline || config.hideJoined;
+		boolean filterActive = applyListFilters && (config.hideOffline || config.hideJoined);
 		boolean sizeChanged = servers.size() != lastBuiltServerCount;
 		boolean filterToggled = filterActive != lastBuiltHideOffline;
 		if (!sizeChanged && !filterToggled && !filterActive) {
@@ -680,8 +694,9 @@ public class ScannerListWidget {
 			ScannedServer server = servers.get(i);
 			ScannerEntry entry = entryCache.computeIfAbsent(server.key(), k -> new ScannerEntry(server));
 
-			boolean drop = (config.hideOffline && entry.isUnreachable())
-					|| (config.hideJoined && JoinedServers.get().hasJoined(server.address()));
+			boolean drop = applyListFilters
+					&& ((config.hideOffline && entry.isUnreachable())
+							|| (config.hideJoined && JoinedServers.get().hasJoined(server.address())));
 			if (!drop) next.add(entry);
 		}
 
@@ -699,4 +714,22 @@ public class ScannerListWidget {
 		}
 		// The anchor itself was dropped; leave the scroll where it is rather than guessing.
 	}
+
+	// --- Shared with the auto-join queue, which draws the same kind of row -------------------
+
+	/** The server's favicon, or vanilla's placeholder until one arrives. */
+	static void drawServerIcon(DrawContext context, ScannerEntry entry, int x, int y) {
+		context.drawTexture(entry.getIconTexture(), x, y, 0, 0.0F, 0.0F, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
+	}
+
+	/** One of the ping pictograms, at its natural ten by eight. */
+	static void drawStatusIcon(DrawContext context, Identifier texture, int x, int y) {
+		context.drawGuiTexture(texture, x, y, 10, 8);
+	}
+
+	/** The row height the finder uses, so another list can match it. */
+	static int iconSize() {
+		return ICON_SIZE;
+	}
+
 }

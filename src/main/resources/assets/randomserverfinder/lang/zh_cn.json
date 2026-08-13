@@ -97,5 +97,12 @@
   "randomserverfinder.lock_the_party": "锁定队伍",
   "randomserverfinder.need_public_ip": "你的公网 IP 并转发端口 %s。",
   "randomserverfinder.and_n_more": "还有 %s 人",
-  "randomserverfinder.checking_address": "正在检测 %s..."
+  "randomserverfinder.checking_address": "正在检测 %s...",
+  "randomserverfinder.join_the_party": "加入",
+  "randomserverfinder.tip.join_the_server_the_party": "加入队伍所在的服务器。",
+  "randomserverfinder.auto_join_queue": "自动加入队列",
+  "randomserverfinder.queue_empty": "队列中还没有服务器，搜索仍在进行。",
+  "randomserverfinder.queue_hint": "队列中有 %s 个。拖动行可重新排序，点击叉号可移除。",
+  "randomserverfinder.queue_hint_empty": "自动加入将按顺序尝试的服务器",
+  "randomserverfinder.tip.see_what_is_lined_up": "查看接下来要尝试的服务器，并调整顺序。"
 }

@@ -225,17 +225,23 @@ public final class FilterIcons {
 			"..........",
 	};
 
-	/** Body text with the heading picked out: what each row leads with. */
+	/**
+	 * Body text with the heading picked out: what each row leads with.
+	 *
+	 * <p>Three body lines rather than two, so the heading is the smaller half. With only two short
+	 * lines under it the accent outweighed the dark and the icon read as a green block with some
+	 * debris beneath, which is the opposite of "the heading is the bit being chosen".
+	 */
 	public static final String[] HEADLINE = {
 			"..........",
 			"oooooooo..",
 			"oooooooo..",
 			"..........",
+			"########..",
+			"..........",
+			"########..",
 			"..........",
 			"######....",
-			"..........",
-			"####......",
-			"..........",
 			"..........",
 	};
 
@@ -351,17 +357,63 @@ public final class FilterIcons {
 			"..........",
 	};
 
-	/** A checkered swatch: the resource pack a server hands you on the way in. */
+	/**
+	 * A framed picture: the resource pack a server hands you on the way in.
+	 *
+	 * <p>The chequered swatch this replaced alternated dark and accent across the whole icon, which
+	 * is the rule above broken as plainly as it can be — half of it was lit and none of that half
+	 * meant anything. At ten pixels it read as static rather than as a texture.
+	 */
 	public static final String[] RESOURCE_PACK = {
 			"..........",
 			".########.",
-			".#oo##oo#.",
-			".#oo##oo#.",
-			".###oo###.",
-			".###oo###.",
-			".#oo##oo#.",
-			".#oo##oo#.",
+			".#......#.",
+			".#......#.",
+			".#...#..#.",
+			".#..###.#.",
+			".#.######.",
+			".#......#.",
 			".########.",
+			"..........",
+	};
+
+	/**
+	 * A handheld: Bedrock Edition, the one that runs on phones and consoles.
+	 *
+	 * <p>This row used to borrow {@link #VANILLA}, whose grass block means "an unmodded server" and
+	 * nothing whatever about which edition it runs. Two rows sharing one picture is bad enough; that
+	 * picture also being the only green-by-depiction icon made this the loudest thing on the page.
+	 */
+	public static final String[] BEDROCK = {
+			"..######..",
+			"..#....#..",
+			"..#....#..",
+			"..#....#..",
+			"..#....#..",
+			"..#....#..",
+			"..#....#..",
+			"..#.##.#..",
+			"..######..",
+			"..........",
+	};
+
+	/**
+	 * A block with one either side of it: the ports next to a server that answered.
+	 *
+	 * <p>The neighbours carry the accent because they are what the setting adds — the middle is the
+	 * server you already had. Borrowed {@link #SUBNET} before, which is a range of addresses and is
+	 * still in use by the filter of that name a few rows up.
+	 */
+	public static final String[] NEARBY_PORTS = {
+			"..........",
+			"..........",
+			"...####...",
+			"...####...",
+			".oo####oo.",
+			".oo####oo.",
+			"...####...",
+			"...####...",
+			"..........",
 			"..........",
 	};
 

@@ -97,5 +97,12 @@
   "randomserverfinder.tip.keep_trying_random_servers": "Seguir probando servidores al azar hasta que uno te deje entrar.\nCasi todos rechazan: listas blancas, baneos, mods, servidores llenos.\nContinúa cuando sales de un servidor, hasta que pulses parar.",
   "randomserverfinder.need_public_ip": "tu IP pública con el puerto %s redirigido.",
   "randomserverfinder.and_n_more": "y %s más",
-  "randomserverfinder.checking_address": "Comprobando %s..."
+  "randomserverfinder.checking_address": "Comprobando %s...",
+  "randomserverfinder.join_the_party": "Entrar",
+  "randomserverfinder.tip.join_the_server_the_party": "Entrar al servidor donde está el grupo.",
+  "randomserverfinder.auto_join_queue": "Cola de entrada automática",
+  "randomserverfinder.queue_empty": "Todavía no hay nada en cola. La búsqueda sigue en marcha.",
+  "randomserverfinder.queue_hint": "%s en cola. Arrastra una fila para reordenar, o pulsa la cruz para quitarla.",
+  "randomserverfinder.queue_hint_empty": "Servidores que la entrada automática probará, en orden",
+  "randomserverfinder.tip.see_what_is_lined_up": "Mira qué viene después y cambia el orden."
 }

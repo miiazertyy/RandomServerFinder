@@ -97,5 +97,12 @@
   "randomserverfinder.lock_the_party": "Закрыть группу",
   "randomserverfinder.need_public_ip": "ваш публичный IP с проброшенным портом %s.",
   "randomserverfinder.and_n_more": "и ещё %s",
-  "randomserverfinder.checking_address": "Проверка %s..."
+  "randomserverfinder.checking_address": "Проверка %s...",
+  "randomserverfinder.join_the_party": "Войти",
+  "randomserverfinder.tip.join_the_server_the_party": "Войти на сервер, где находится группа.",
+  "randomserverfinder.auto_join_queue": "Очередь автовхода",
+  "randomserverfinder.queue_empty": "В очереди пока пусто. Поиск ещё идёт.",
+  "randomserverfinder.queue_hint": "В очереди: %s. Перетащите строку, чтобы изменить порядок, или нажмите крестик, чтобы убрать.",
+  "randomserverfinder.queue_hint_empty": "Серверы, которые автовход попробует по порядку",
+  "randomserverfinder.tip.see_what_is_lined_up": "Посмотреть, что дальше, и изменить порядок."
 }

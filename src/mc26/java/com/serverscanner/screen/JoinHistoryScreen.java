@@ -115,6 +115,8 @@ public class JoinHistoryScreen extends Screen {
 		feed.start();
 
 		list = new ScannerListWidget(feed, config);
+		// Everything here has been joined, so the hide-joined filter would empty the screen.
+		list.setApplyListFilters(false);
 		list.setOnJoin(this::join);
 	}
 

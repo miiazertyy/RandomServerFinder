@@ -97,5 +97,12 @@
   "randomserverfinder.tip.keep_trying_random_servers": "Essayer des serveurs au hasard jusqu'à ce que l'un t'accepte.\nLa plupart refusent : listes blanches, bannissements, mods, serveurs pleins.\nContinue après avoir quitté un serveur, jusqu'à ce que tu appuies sur stop.",
   "randomserverfinder.need_public_ip": "ton IP publique avec le port %s redirigé.",
   "randomserverfinder.and_n_more": "et %s de plus",
-  "randomserverfinder.checking_address": "Vérification de %s..."
+  "randomserverfinder.checking_address": "Vérification de %s...",
+  "randomserverfinder.join_the_party": "Rejoindre",
+  "randomserverfinder.tip.join_the_server_the_party": "Rejoindre le serveur où se trouve le groupe.",
+  "randomserverfinder.auto_join_queue": "File d'attente de connexion auto",
+  "randomserverfinder.queue_empty": "Rien en attente pour l'instant. La recherche continue.",
+  "randomserverfinder.queue_hint": "%s en attente. Glissez une ligne pour réordonner, ou cliquez la croix pour retirer.",
+  "randomserverfinder.queue_hint_empty": "Serveurs que la connexion auto essaiera, dans l'ordre",
+  "randomserverfinder.tip.see_what_is_lined_up": "Voir ce qui vient ensuite et changer l'ordre."
 }

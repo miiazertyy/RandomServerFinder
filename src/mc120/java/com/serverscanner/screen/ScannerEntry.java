@@ -24,7 +24,7 @@ import java.util.List;
  */
 public class ScannerEntry {
 	private static final net.minecraft.util.Identifier UNKNOWN_SERVER =
-			new net.minecraft.util.Identifier("textures/misc/unknown_server.png");
+			Ids.of("textures/misc/unknown_server.png");
 
 	private final ScannedServer server;
 	private final ServerInfo serverInfo;

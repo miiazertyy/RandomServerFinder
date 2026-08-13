@@ -47,6 +47,16 @@ public final class PartyManager {
 	/** When to tell members the host has gone, or 0 when nothing is pending. */
 	private static volatile long leaveDueAt;
 
+	/**
+	 * Where the host currently is, as last announced.
+	 *
+	 * <p>Kept separately from {@link #pendingTravel}, which is consumed the moment it is applied.
+	 * This one persists, so a member who leaves the server can be offered a way back without
+	 * waiting for the host to move again. Also sent to anyone joining the party late, who would
+	 * otherwise have no idea where everyone is.
+	 */
+	private static volatile String hostServer;
+
 	/** Set when the host says it has left, applied on the client thread by {@link #tick}. */
 	private static volatile boolean pendingLeave;
 	private static final int MAX_LINE_LENGTH = 512;
@@ -104,6 +114,11 @@ public final class PartyManager {
 
 	public static boolean hasTravelled() {
 		return travelled;
+	}
+
+	/** The server the party is on, or null when nobody has said. */
+	public static String getHostServer() {
+		return hostServer;
 	}
 
 	public static void clearTravelled() {
@@ -171,6 +186,7 @@ public final class PartyManager {
 		pendingTravel = null;
 		pendingLeave = false;
 		leaveDueAt = 0L;
+		hostServer = null;
 	}
 
 	/**
@@ -185,6 +201,8 @@ public final class PartyManager {
 
 		// A trip cancels a pending departure: leaving the old world is the first half of this.
 		leaveDueAt = 0L;
+
+		hostServer = serverAddress;
 
 		if (!ScannerConfig.get().partyFollowJoin) return;
 		host.broadcast("GOTO\t" + serverAddress);
@@ -372,6 +390,8 @@ public final class PartyManager {
 						if (line.length() > MAX_LINE_LENGTH) continue;
 						String[] parts = line.split("\t");
 						if (parts.length >= 2 && parts[0].equals("HELLO")) {
+							String at = hostServer;
+							if (at != null) send("AT\t" + at);
 							name = sanitise(parts[1]);
 							Minecraft minecraft = Minecraft.getInstance();
 							if (minecraft != null) minecraft.execute(PartyManager::updateMembers);
@@ -469,8 +489,14 @@ public final class PartyManager {
 					// Applied on the client thread; a world cannot be torn down from here.
 					pendingLeave = true;
 				}
+				case "AT" -> {
+					// Where the party already is. Unlike GOTO this does not move anyone; it only
+					// answers "where is everyone" for someone who just connected or just left.
+					if (parts.length >= 2) hostServer = sanitise(parts[1]);
+				}
 				case "GOTO" -> {
 					if (parts.length >= 2) {
+						hostServer = sanitise(parts[1]);
 						// Applied on the client thread; screens cannot be changed from here.
 						pendingTravel = sanitise(parts[1]);
 					}
