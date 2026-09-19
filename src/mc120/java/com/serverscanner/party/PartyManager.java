@@ -33,6 +33,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * is present.
  *
  * <p>The protocol is deliberately tiny: newline-terminated, tab-separated text.
+ *
+ * <h2>Handing the crown over</h2>
+ *
+ * <p>Whoever holds the crown leads: the party follows them onto servers and out of them. It starts
+ * with whoever hosted and can be passed to any member. Only the lead moves, not the connection: the
+ * host's machine goes on relaying for everyone, because moving the socket would mean every member
+ * reconnecting to a new address that may not even be reachable. A member who leads sends their trips
+ * to the relay, which passes them on exactly as if the host had made them.
  */
 public final class PartyManager {
 	public static final int DEFAULT_PORT = 25577;
@@ -74,6 +82,15 @@ public final class PartyManager {
 	/** Usernames currently in the party, host first. */
 	private static volatile List<String> members = List.of();
 
+	/** Position in {@link #members} of whoever holds the crown. */
+	private static volatile int leaderIndex;
+
+	/** Our own position in {@link #members}, or -1 until the host has told us. */
+	private static volatile int selfIndex = -1;
+
+	/** Bumped whenever the roster or the crown changes, so screens know to rebuild. */
+	private static volatile int rosterVersion;
+
 	private static volatile String status = "";
 	private static volatile String error;
 
@@ -98,6 +115,40 @@ public final class PartyManager {
 
 	public static List<String> getMembers() {
 		return members;
+	}
+
+	public static int getLeaderIndex() {
+		return leaderIndex;
+	}
+
+	public static int getSelfIndex() {
+		return selfIndex;
+	}
+
+	/** True when this client holds the crown, and so decides where the party goes. */
+	public static boolean isLeader() {
+		return isActive() && selfIndex >= 0 && selfIndex == leaderIndex;
+	}
+
+	public static int getRosterVersion() {
+		return rosterVersion;
+	}
+
+	/**
+	 * Passes the crown to the member at {@code index} in {@link #getMembers}. Only the current leader
+	 * can; the name is sent along so a roster that shifted in the meantime cannot crown the wrong
+	 * person.
+	 */
+	public static void giveLead(int index) {
+		if (!isLeader() || index == selfIndex) return;
+		List<String> names = members;
+		if (index < 0 || index >= names.size()) return;
+
+		if (mode == Mode.HOSTING && host != null) {
+			host.crown(index, names.get(index));
+		} else if (mode == Mode.JOINED && client != null) {
+			client.send("LEAD\t" + index + "\t" + names.get(index));
+		}
 	}
 
 	public static String getStatus() {
@@ -182,6 +233,9 @@ public final class PartyManager {
 		}
 		mode = Mode.OFF;
 		members = List.of();
+		leaderIndex = 0;
+		selfIndex = -1;
+		rosterVersion++;
 		status = "";
 		pendingTravel = null;
 		pendingLeave = false;
@@ -190,11 +244,11 @@ public final class PartyManager {
 	}
 
 	/**
-	 * Announces the server the party should move to. Only the host can do this; a member joining a
-	 * server on their own does not drag everyone else along.
+	 * Announces the server the party should move to. Only the leader can do this; anyone else joining
+	 * a server on their own does not drag everyone else along.
 	 */
 	public static void announceTravel(String serverAddress) {
-		if (mode != Mode.HOSTING || host == null) return;
+		if (!isLeader()) return;
 
 		// The host is travelling either way, so they also come back to the finder afterwards.
 		travelled = true;
@@ -204,7 +258,12 @@ public final class PartyManager {
 
 		hostServer = serverAddress;
 
-		if (!ScannerConfig.get().partyFollowJoin) return;
+		if (mode == Mode.JOINED) {
+			// The relay applies the host's follow settings; theirs are the ones that count.
+			if (client != null) client.send("GOTO\t" + serverAddress);
+			return;
+		}
+		if (!ScannerConfig.get().partyFollowJoin || host == null) return;
 		host.broadcast("GOTO\t" + serverAddress);
 	}
 
@@ -221,8 +280,8 @@ public final class PartyManager {
 	 * is silent; nothing cancelling it means the host really has gone, and it fires.
 	 */
 	public static void announceLeave() {
-		if (mode != Mode.HOSTING || host == null) return;
-		if (!ScannerConfig.get().partyFollowLeave) return;
+		if (!isLeader()) return;
+		if (mode == Mode.HOSTING && !ScannerConfig.get().partyFollowLeave) return;
 		leaveDueAt = System.currentTimeMillis() + leaveDelayMillis();
 	}
 
@@ -245,7 +304,10 @@ public final class PartyManager {
 				leaveDueAt = 0L;
 			} else if (System.currentTimeMillis() >= leaveDueAt) {
 				leaveDueAt = 0L;
-				if (mode == Mode.HOSTING && host != null) host.broadcast("LEAVE");
+				if (isLeader()) {
+					if (mode == Mode.HOSTING && host != null) host.broadcast("LEAVE");
+					if (mode == Mode.JOINED && client != null) client.send("LEAVE");
+				}
 			}
 		}
 
@@ -275,14 +337,23 @@ public final class PartyManager {
 
 	private static void updateMembers() {
 		List<String> names = new ArrayList<>();
-		String self = selfName();
 		if (mode == Mode.HOSTING) {
-			names.add(self + " (host)");
+			names.add(selfName());
 			if (host != null) names.addAll(host.memberNames());
+			leaderIndex = host != null ? host.leaderIndex() : 0;
+			selfIndex = 0;
 		} else if (mode == Mode.JOINED && client != null) {
 			names.addAll(client.knownMembers);
+			leaderIndex = client.leaderIndex;
+			selfIndex = client.selfIndex;
 		}
 		members = Collections.unmodifiableList(names);
+		rosterVersion++;
+	}
+
+	private static void refreshOnClientThread() {
+		MinecraftClient minecraft = MinecraftClient.getInstance();
+		if (minecraft != null) minecraft.execute(PartyManager::updateMembers);
 	}
 
 	private static String selfName() {
@@ -297,6 +368,9 @@ public final class PartyManager {
 		private final ServerSocket serverSocket;
 		private final List<Member> connected = new CopyOnWriteArrayList<>();
 		private volatile boolean closed;
+
+		/** The member holding the crown, or null while the host keeps it. */
+		private volatile Member leader;
 
 		Host(int port) throws IOException {
 			serverSocket = new ServerSocket();
@@ -331,25 +405,103 @@ public final class PartyManager {
 			}
 		}
 
+		/** Everyone who has said who they are, in roster order (after the host, who is first). */
+		private List<Member> named() {
+			List<Member> named = new ArrayList<>();
+			for (Member member : connected) {
+				if (member.name != null) named.add(member);
+			}
+			return named;
+		}
+
 		List<String> memberNames() {
 			List<String> names = new ArrayList<>();
-			for (Member member : connected) {
-				if (member.name != null) names.add(member.name);
-			}
+			for (Member member : named()) names.add(member.name);
 			return names;
+		}
+
+		int leaderIndex() {
+			Member current = leader;
+			return current == null ? 0 : named().indexOf(current) + 1;
+		}
+
+		/** Hands the crown to roster position {@code index}, if it still holds {@code name}. */
+		void crown(int index, String name) {
+			if (index == 0) {
+				if (!selfName().equals(name)) return;
+				leader = null;
+			} else {
+				List<Member> named = named();
+				if (index > named.size() || !named.get(index - 1).name.equals(name)) return;
+				leader = named.get(index - 1);
+			}
+			rosterChanged();
 		}
 
 		void remove(Member member) {
 			connected.remove(member);
-			MinecraftClient minecraft = MinecraftClient.getInstance();
-			if (minecraft != null) minecraft.execute(PartyManager::updateMembers);
-			broadcast(rosterLine());
+			// A leader who drops out gives the crown back to the host rather than taking it with them.
+			if (leader == member) leader = null;
+			rosterChanged();
 		}
 
-		String rosterLine() {
-			StringBuilder sb = new StringBuilder("MEMBERS\t").append(selfName()).append(" (host)");
-			for (String name : memberNames()) sb.append('\t').append(name);
-			return sb.toString();
+		/**
+		 * Tells everyone who is here and who leads.
+		 *
+		 * <p>The crown goes on a line of its own, along with each member's own position, so clients
+		 * from before the crown existed simply ignore it and still get a working roster.
+		 */
+		void rosterChanged() {
+			refreshOnClientThread();
+
+			List<Member> named = named();
+			StringBuilder sb = new StringBuilder("MEMBERS\t").append(selfName());
+			for (Member member : named) sb.append('\t').append(member.name);
+			String roster = sb.toString();
+
+			Member current = leader;
+			int lead = current == null ? 0 : named.indexOf(current) + 1;
+			for (Member member : connected) {
+				int position = named.indexOf(member);
+				member.send(roster);
+				member.send("LEADER\t" + lead + "\t" + (position < 0 ? -1 : position + 1));
+			}
+		}
+
+		/** Something only the leader may say, arriving from a member who might not be. */
+		void fromLeader(Member sender, String[] parts) {
+			if (sender != leader) return;
+			switch (parts[0]) {
+				case "GOTO" -> {
+					if (parts.length < 2) return;
+					String where = sanitise(parts[1]);
+					hostServer = where;
+					if (!ScannerConfig.get().partyFollowJoin) return;
+					for (Member member : connected) {
+						if (member != sender) member.send("GOTO\t" + where);
+					}
+					// The host follows too; they are part of the party like anyone else.
+					pendingTravel = where;
+				}
+				case "LEAVE" -> {
+					if (!ScannerConfig.get().partyFollowLeave) return;
+					for (Member member : connected) {
+						if (member != sender) member.send("LEAVE");
+					}
+					pendingLeave = true;
+				}
+				case "LEAD" -> {
+					if (parts.length < 3) return;
+					try {
+						crown(Integer.parseInt(parts[1]), sanitise(parts[2]));
+					} catch (NumberFormatException ignored) {
+						// A malformed hand-over is simply not one.
+					}
+				}
+				default -> {
+					// Anything else from a member is not ours to act on.
+				}
+			}
 		}
 
 		void close() {
@@ -393,9 +545,9 @@ public final class PartyManager {
 							String at = hostServer;
 							if (at != null) send("AT\t" + at);
 							name = sanitise(parts[1]);
-							MinecraftClient minecraft = MinecraftClient.getInstance();
-							if (minecraft != null) minecraft.execute(PartyManager::updateMembers);
-							broadcast(rosterLine());
+							rosterChanged();
+						} else {
+							fromLeader(this, parts);
 						}
 					}
 				} catch (IOException e) {
@@ -405,7 +557,7 @@ public final class PartyManager {
 				}
 			}
 
-			void send(String line) {
+			synchronized void send(String line) {
 				BufferedWriter writer = out;
 				if (writer == null) return;
 				try {
@@ -433,7 +585,12 @@ public final class PartyManager {
 	private static final class Client {
 		private final List<String> knownMembers = new CopyOnWriteArrayList<>();
 		private volatile Socket socket;
+		private volatile BufferedWriter out;
 		private volatile boolean closed;
+
+		/** Where the crown is, and where we are. A host from before the crown never says: it leads. */
+		private volatile int leaderIndex;
+		private volatile int selfIndex = -1;
 
 		Client(String hostName, int port) {
 			Thread thread = new Thread(() -> run(hostName, port), "party-client");
@@ -446,11 +603,8 @@ public final class PartyManager {
 				socket = open;
 				open.connect(new InetSocketAddress(hostName, port), 8000);
 
-				BufferedWriter out = new BufferedWriter(
-						new OutputStreamWriter(open.getOutputStream(), StandardCharsets.UTF_8));
-				out.write("HELLO\t" + sanitise(selfName()));
-				out.write('\n');
-				out.flush();
+				out = new BufferedWriter(new OutputStreamWriter(open.getOutputStream(), StandardCharsets.UTF_8));
+				send("HELLO\t" + sanitise(selfName()));
 
 				status = "Connected to " + hostName;
 
@@ -482,8 +636,17 @@ public final class PartyManager {
 					for (int i = 1; i < parts.length && i <= MAX_MEMBERS; i++) {
 						knownMembers.add(sanitise(parts[i]));
 					}
-					MinecraftClient minecraft = MinecraftClient.getInstance();
-					if (minecraft != null) minecraft.execute(PartyManager::updateMembers);
+					refreshOnClientThread();
+				}
+				case "LEADER" -> {
+					if (parts.length < 3) return;
+					try {
+						leaderIndex = Integer.parseInt(parts[1]);
+						selfIndex = Integer.parseInt(parts[2]);
+					} catch (NumberFormatException ignored) {
+						return;
+					}
+					refreshOnClientThread();
 				}
 				case "LEAVE" -> {
 					// Applied on the client thread; a world cannot be torn down from here.
@@ -504,6 +667,18 @@ public final class PartyManager {
 				default -> {
 					// Unknown message from a newer version; ignoring is the friendly thing to do.
 				}
+			}
+		}
+
+		synchronized void send(String line) {
+			BufferedWriter writer = out;
+			if (writer == null) return;
+			try {
+				writer.write(line);
+				writer.write('\n');
+				writer.flush();
+			} catch (IOException e) {
+				ServerScannerMod.LOGGER.debug("Party send failed", e);
 			}
 		}
 

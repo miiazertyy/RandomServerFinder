@@ -408,11 +408,23 @@ public class ServerScannerScreen extends Screen {
 		if (!PartyManager.isActive()) return;
 
 		java.util.List<String> members = PartyManager.getMembers();
-		String text = members.isEmpty()
-				? "Party: waiting for friends to connect"
-				: "Party: " + String.join(", ", members);
-		context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(text),
-				this.width / 2, 34, 0xFF7FD1A0);
+		if (members.isEmpty()) {
+			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Party: waiting for friends to connect"),
+					this.width / 2, 34, 0xFF7FD1A0);
+			return;
+		}
+
+		// The crown goes in the line itself, just before whoever leads, so it is clear whose trips
+		// everyone follows.
+		int lead = Math.min(Math.max(PartyManager.getLeaderIndex(), 0), members.size() - 1);
+		String before = "Party: " + String.join(", ", members.subList(0, lead)) + (lead > 0 ? ", " : "");
+		String after = String.join(", ", members.subList(lead, members.size()));
+		int crown = com.serverscanner.party.CrownIcon.WIDTH + 3;
+		int x = this.width / 2 - (this.textRenderer.getWidth(before) + crown + this.textRenderer.getWidth(after)) / 2;
+		context.drawTextWithShadow(this.textRenderer, before, x, 34, 0xFF7FD1A0);
+		x += this.textRenderer.getWidth(before);
+		Icons.drawCrown(context, x + 1, 34);
+		context.drawTextWithShadow(this.textRenderer, after, x + crown, 34, 0xFF7FD1A0);
 	}
 
 	/**

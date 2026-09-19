@@ -13,7 +13,8 @@ $dist = Join-Path $root 'dist'
 $modVersion = (Select-String -Path (Join-Path $root 'gradle.properties') -Pattern '^mod_version=(.+)$').Matches[0].Groups[1].Value.Trim()
 $backup = Join-Path $root 'gradle.properties.bak'
 
-# version = @(yarn, fabric-api, loader)
+# The versions live in versions.json, which the GitHub workflow reads too, so a version added for
+# one is built by both. Each entry is minecraft, yarn, fabric_api, loader.
 #
 # 26.x is unobfuscated and needs no mappings, so its yarn entry is unused — build.gradle picks the
 # non-remapping Loom plugin and the src/mc26 sources from the version number alone.
@@ -28,19 +29,20 @@ $backup = Join-Path $root 'gradle.properties.bak'
 #
 # Those differences are overrides and enum constants, so their shapes have to match at compile time;
 # no amount of reflection bridges them, which is why the trees exist at all.
-$targets = [ordered]@{
-    '26.2'    = @('unused', '0.156.0+26.2', '0.19.3')
-    '26.1.2'  = @('unused', '0.155.2+26.1.2', '0.19.3')
-    '1.21.11' = @('1.21.11+build.6', '0.141.6+1.21.11', '0.19.3')
-    '1.21.1'  = @('1.21.1+build.3', '0.116.15+1.21.1', '0.16.14')
-    '1.20.6'  = @('1.20.6+build.3', '0.100.8+1.20.6', '0.15.11')
-    '1.20.1'  = @('1.20.1+build.10', '0.92.11+1.20.1', '0.15.11')
+$targets = [ordered]@{}
+foreach ($entry in (Get-Content (Join-Path $root 'versions.json') -Raw | ConvertFrom-Json)) {
+    $targets[$entry.minecraft] = @($entry.yarn, $entry.fabric_api, $entry.loader)
 }
 
-# Only build the versions named on the command line, if any.
+# Only build the versions named on the command line, if any. Compared as text: unquoted, PowerShell
+# passes 26.2 as a number, which matched nothing and skipped that version without a word.
 if ($args.Count -gt 0) {
     $filtered = [ordered]@{}
-    foreach ($a in $args) { if ($targets.Contains($a)) { $filtered[$a] = $targets[$a] } }
+    foreach ($a in $args) {
+        $name = [string]$a
+        if ($targets.Contains($name)) { $filtered[$name] = $targets[$name] }
+        else { Write-Host "unknown version $name, see versions.json" }
+    }
     $targets = $filtered
 }
 

@@ -617,13 +617,18 @@ public class ScannerListWidget {
 		return true;
 	}
 
-	/** Page/Home/End navigation. Returns true when the key was consumed. */
+	/**
+	 * Page/Home/End navigation. Returns true when the key was consumed.
+	 *
+	 * <p>Minecraft's own key constants rather than GLFW's: 26.3 replaced GLFW with SDL, so the GLFW
+	 * values no longer match the key codes the game hands us.
+	 */
 	public boolean handleNavigationKey(int keyCode) {
 		switch (keyCode) {
-			case org.lwjgl.glfw.GLFW.GLFW_KEY_PAGE_DOWN -> targetScroll = clampScroll(targetScroll + height);
-			case org.lwjgl.glfw.GLFW.GLFW_KEY_PAGE_UP -> targetScroll = clampScroll(targetScroll - height);
-			case org.lwjgl.glfw.GLFW.GLFW_KEY_HOME -> targetScroll = 0;
-			case org.lwjgl.glfw.GLFW.GLFW_KEY_END -> targetScroll = getMaxScroll();
+			case com.mojang.blaze3d.platform.InputConstants.KEY_PAGEDOWN -> targetScroll = clampScroll(targetScroll + height);
+			case com.mojang.blaze3d.platform.InputConstants.KEY_PAGEUP -> targetScroll = clampScroll(targetScroll - height);
+			case com.mojang.blaze3d.platform.InputConstants.KEY_HOME -> targetScroll = 0;
+			case com.mojang.blaze3d.platform.InputConstants.KEY_END -> targetScroll = getMaxScroll();
 			default -> {
 				return false;
 			}

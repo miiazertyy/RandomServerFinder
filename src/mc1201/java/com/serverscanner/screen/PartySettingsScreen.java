@@ -118,22 +118,24 @@ public class PartySettingsScreen extends Screen {
 
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float deltaTicks) {
-		super.render(context, mouseX, mouseY, deltaTicks);
-
 		int centre = this.width / 2;
 		int left = centre - PANEL_WIDTH / 2;
 
-		context.drawCenteredTextWithShadow(this.textRenderer, this.title, centre, 14, 0xFFFFFFFF);
-		context.drawCenteredTextWithShadow(this.textRenderer,
-				Text.translatable("randomserverfinder.these_apply_to_everyone_only"),
-				centre, 28, SUBTITLE);
-
+		// Before the widgets, not after: drawn over them, the translucent panel dimmed every
+		// control inside it until it looked disabled.
 		int panelBottom = this.height - 40;
 		context.fill(left, 44, left + PANEL_WIDTH, panelBottom, PANEL_BG);
 		context.fill(left, 44, left + PANEL_WIDTH, 45, PANEL_BORDER);
 		context.fill(left, panelBottom - 1, left + PANEL_WIDTH, panelBottom, PANEL_BORDER);
 		context.fill(left, 44, left + 1, panelBottom, PANEL_BORDER);
 		context.fill(left + PANEL_WIDTH - 1, 44, left + PANEL_WIDTH, panelBottom, PANEL_BORDER);
+
+		super.render(context, mouseX, mouseY, deltaTicks);
+
+		context.drawCenteredTextWithShadow(this.textRenderer, this.title, centre, 14, 0xFFFFFFFF);
+		context.drawCenteredTextWithShadow(this.textRenderer,
+				Text.translatable("randomserverfinder.these_apply_to_everyone_only"),
+				centre, 28, SUBTITLE);
 
 		for (Row row : rows) {
 			int iconY = row.y() + (20 - FilterIcons.SIZE) / 2;

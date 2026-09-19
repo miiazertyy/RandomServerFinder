@@ -20,6 +20,17 @@ final class Icons {
 	private Icons() {
 	}
 
+	/** The party leader's crown, top-left corner at x, y. */
+	static void drawCrown(GuiGraphicsExtractor context, int x, int y) {
+		String[] pixels = com.serverscanner.party.CrownIcon.PIXELS;
+		for (int row = 0; row < pixels.length; row++) {
+			for (int column = 0; column < pixels[row].length(); column++) {
+				int colour = com.serverscanner.party.CrownIcon.colour(pixels[row].charAt(column));
+				if (colour != 0) context.fill(x + column, y + row, x + column + 1, y + row + 1, colour);
+			}
+		}
+	}
+
 	static void draw(GuiGraphicsExtractor context, String[] icon, int x, int y) {
 		draw(context, icon, x, y, false);
 	}

@@ -118,22 +118,24 @@ public class PartySettingsScreen extends Screen {
 
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float deltaTicks) {
-		super.extractRenderState(context, mouseX, mouseY, deltaTicks);
-
 		int centre = this.width / 2;
 		int left = centre - PANEL_WIDTH / 2;
 
-		com.serverscanner.compat.Draw.centered(context, this.font, this.title, centre, 14, 0xFFFFFFFF);
-		com.serverscanner.compat.Draw.centered(context, this.font,
-				Component.translatable("randomserverfinder.these_apply_to_everyone_only"),
-				centre, 28, SUBTITLE);
-
+		// Before the widgets, not after: drawn over them, the translucent panel dimmed every
+		// control inside it until it looked disabled.
 		int panelBottom = this.height - 40;
 		context.fill(left, 44, left + PANEL_WIDTH, panelBottom, PANEL_BG);
 		context.fill(left, 44, left + PANEL_WIDTH, 45, PANEL_BORDER);
 		context.fill(left, panelBottom - 1, left + PANEL_WIDTH, panelBottom, PANEL_BORDER);
 		context.fill(left, 44, left + 1, panelBottom, PANEL_BORDER);
 		context.fill(left + PANEL_WIDTH - 1, 44, left + PANEL_WIDTH, panelBottom, PANEL_BORDER);
+
+		super.extractRenderState(context, mouseX, mouseY, deltaTicks);
+
+		com.serverscanner.compat.Draw.centered(context, this.font, this.title, centre, 14, 0xFFFFFFFF);
+		com.serverscanner.compat.Draw.centered(context, this.font,
+				Component.translatable("randomserverfinder.these_apply_to_everyone_only"),
+				centre, 28, SUBTITLE);
 
 		for (Row row : rows) {
 			int iconY = row.y() + (20 - FilterIcons.SIZE) / 2;

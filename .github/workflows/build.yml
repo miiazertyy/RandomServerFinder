@@ -1,0 +1,124 @@
+# Builds the mod for every Minecraft version in versions.json, one job each, side by side.
+#
+# Every push and pull request gets the jars as downloadable artifacts. Pushing a tag like v1.0.2
+# does the same and then publishes them as a GitHub release, once the tag agrees with mod_version.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  versions:
+    name: Read versions
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.read.outputs.matrix }}
+      mod_version: ${{ steps.read.outputs.mod_version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # versions.json is the same list build-all.ps1 builds locally, so the two cannot drift apart.
+      - id: read
+        run: |
+          echo "matrix=$(jq -c . versions.json)" >> "$GITHUB_OUTPUT"
+          echo "mod_version=$(sed -n 's/^mod_version=//p' gradle.properties | tr -d '\r')" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Minecraft ${{ matrix.minecraft }}
+    needs: versions
+    runs-on: ubuntu-latest
+    strategy:
+      # One version failing says nothing about the others, so let them all finish.
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.versions.outputs.matrix) }}
+    env:
+      MOD_VERSION: ${{ needs.versions.outputs.mod_version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # 21 compiles 1.20.x and 1.21.x, 25 compiles 26.x. Both are installed so Gradle finds its
+      # toolchain here instead of downloading one per job.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            25
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # Through bash rather than ./gradlew: the wrapper is stored without its executable bit.
+      # The -P values override gradle.properties, which is left as committed.
+      - name: Build
+        run: >-
+          bash ./gradlew build --no-daemon --stacktrace
+          -Porg.gradle.java.installations.fromEnv=JAVA_HOME_21_X64,JAVA_HOME_25_X64
+          "-Pminecraft_version=${{ matrix.minecraft }}"
+          "-Pyarn_mappings=${{ matrix.yarn }}"
+          "-Pfabric_version=${{ matrix.fabric_api }}"
+          "-Ploader_version=${{ matrix.loader }}"
+
+      # Named the way build-all.ps1 names them, ready to upload anywhere.
+      - name: Name the jar
+        run: |
+          mkdir -p out
+          cp "build/libs/randomserverfinder-${MOD_VERSION}.jar" \
+             "out/randomserverfinder-${MOD_VERSION}-mc${{ matrix.minecraft }}.jar"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: randomserverfinder-mc${{ matrix.minecraft }}
+          path: out/*.jar
+          if-no-files-found: error
+
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [versions, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.ref_name }}
+      MOD_VERSION: ${{ needs.versions.outputs.mod_version }}
+    steps:
+      # A tag that disagrees with gradle.properties would ship jars whose names and fabric.mod.json
+      # say a different version than the release they are attached to.
+      - name: Check the tag matches mod_version
+        run: |
+          if [ "$TAG" != "v$MOD_VERSION" ]; then
+            echo "::error::Tag $TAG does not match mod_version $MOD_VERSION in gradle.properties"
+            exit 1
+          fi
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: randomserverfinder-mc*
+          path: dist
+          merge-multiple: true
+
+      - name: List the jars
+        run: ls -l dist
+
+      # Skipped when run locally with act, which should never publish anything.
+      - name: Publish the release
+        if: ${{ !env.ACT }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$TAG" dist/*.jar
+          --repo "$GITHUB_REPOSITORY"
+          --title "Random Server Finder $MOD_VERSION"
+          --generate-notes

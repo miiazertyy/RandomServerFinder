@@ -1,0 +1,9 @@
+[
+  { "minecraft": "26.3",    "yarn": "unused",          "fabric_api": "0.161.0+26.3",    "loader": "0.19.5" },
+  { "minecraft": "26.2",   "yarn": "unused",          "fabric_api": "0.156.0+26.2",    "loader": "0.19.3" },
+  { "minecraft": "26.1.2",  "yarn": "unused",          "fabric_api": "0.155.2+26.1.2",  "loader": "0.19.3" },
+  { "minecraft": "1.21.11", "yarn": "1.21.11+build.6", "fabric_api": "0.141.6+1.21.11", "loader": "0.19.3" },
+  { "minecraft": "1.21.1",  "yarn": "1.21.1+build.3",  "fabric_api": "0.116.15+1.21.1", "loader": "0.16.14" },
+  { "minecraft": "1.20.6",  "yarn": "1.20.6+build.3",  "fabric_api": "0.100.8+1.20.6",  "loader": "0.15.11" },
+  { "minecraft": "1.20.1",  "yarn": "1.20.1+build.10", "fabric_api": "0.92.11+1.20.1",  "loader": "0.15.11" }
+]
