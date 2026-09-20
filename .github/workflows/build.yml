@@ -38,6 +38,8 @@ jobs:
     name: Minecraft ${{ matrix.minecraft }}
     needs: versions
     runs-on: ubuntu-latest
+    # A build takes about a minute and a half; anything near this is stuck, not slow.
+    timeout-minutes: 30
     strategy:
       # One version failing says nothing about the others, so let them all finish.
       fail-fast: false
