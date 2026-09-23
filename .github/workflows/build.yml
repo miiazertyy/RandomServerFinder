@@ -176,7 +176,7 @@ jobs:
         uses: cloudnode-pro/modrinth-publish@v2.5.2
         with:
           token: ${{ secrets.MODRINTH_TOKEN }}
-          project: YOUR_PROJECT_ID
+          project: jEb1lC88
           version: ${{ env.MOD_VERSION }}+mc${{ matrix.minecraft }}
           changelog: ${{ github.event.release.body }}
           loaders: fabric
