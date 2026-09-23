@@ -283,15 +283,14 @@ afterwards either way.
 `.github/workflows/build.yml` builds every version in `versions.json` side by side on each push
 and pull request, and keeps the jars as downloadable artifacts on the run.
 
-To release, bump `mod_version` in `gradle.properties`, then push a matching tag:
+To release, publish a release on GitHub with a tag like `1.0.2` or `v1.0.2`. The same builds run
+against the tagged commit, and a few minutes later the jars are attached to the release. They are
+built as the version the tag names, so `mod_version` in `gradle.properties` only names local builds.
+A draft is built once it is published. Each jar is also published to Modrinth as its own version,
+which needs a `MODRINTH_TOKEN` repository secret and the project's ID in the workflow.
 
-```shell
-git tag v1.0.2
-git push origin v1.0.2
-```
-
-The same builds run, then the jars are published as a GitHub release with generated notes. A tag
-that does not match `mod_version` fails before anything is published.
+For a release that is already out without its jars, open **Actions → Build → Run workflow** and
+give it the release's tag.
 
 </details>
 

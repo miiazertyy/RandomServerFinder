@@ -1,22 +1,41 @@
 # Builds the mod for every Minecraft version in versions.json, one job each, side by side.
 #
-# Every push and pull request gets the jars as downloadable artifacts. Pushing a tag like v1.0.2
-# does the same and then publishes them as a GitHub release, once the tag agrees with mod_version.
+# Every push and pull request gets the jars as downloadable artifacts. Publishing a release on GitHub
+# does the same, then attaches them to that release and publishes each one to Modrinth. Its tag
+# decides the version they are built as (1.0.2 and v1.0.2 both give 1.0.2), so the jars always match
+# the release they are attached to.
 name: Build
 
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
+  # Published covers a release published straight away, a draft once it is published, and
+  # pre-releases. Drafts themselves run nothing.
+  release:
+    types: [published]
+  # Given the tag of a release that is already out, builds that tag and attaches the jars to it: for
+  # a release published before this workflow handled them, or one whose build failed. Left empty,
+  # it only builds.
   workflow_dispatch:
+    inputs:
+      release:
+        description: Tag of a release to build and attach the jars to (leave empty to only build)
+        type: string
+        required: false
 
 permissions:
   contents: read
 
+env:
+  # The release the jars go to: the one just published, or the one named when run by hand. Empty
+  # for pushes and pull requests.
+  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release }}
+
 concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  group: build-${{ github.event.release.tag_name || inputs.release || github.ref }}
+  # A newer commit makes an older build pointless, but a release build is always seen through.
+  cancel-in-progress: ${{ !github.event.release.tag_name && !inputs.release }}
 
 jobs:
   versions:
@@ -26,13 +45,27 @@ jobs:
       matrix: ${{ steps.read.outputs.matrix }}
       mod_version: ${{ steps.read.outputs.mod_version }}
     steps:
+      # A release builds the commit its tag points at, even when run by hand from main.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG && format('refs/tags/{0}', env.RELEASE_TAG) || '' }}
 
       # versions.json is the same list build-all.ps1 builds locally, so the two cannot drift apart.
+      # A release is built as the version its tag names rather than the one in gradle.properties, so
+      # forgetting to bump mod_version cannot ship jars that say they are the previous release.
       - id: read
         run: |
           echo "matrix=$(jq -c . versions.json)" >> "$GITHUB_OUTPUT"
-          echo "mod_version=$(sed -n 's/^mod_version=//p' gradle.properties | tr -d '\r')" >> "$GITHUB_OUTPUT"
+          if [ -n "$RELEASE_TAG" ]; then
+            version="${RELEASE_TAG#v}"
+            if ! [[ "$version" =~ ^[0-9][0-9A-Za-z.+-]*$ ]]; then
+              echo "::error::Release tag $RELEASE_TAG is not a version like 1.0.2 or v1.0.2"
+              exit 1
+            fi
+          else
+            version=$(sed -n 's/^mod_version=//p' gradle.properties | tr -d '\r')
+          fi
+          echo "mod_version=$version" >> "$GITHUB_OUTPUT"
 
   build:
     name: Minecraft ${{ matrix.minecraft }}
@@ -49,6 +82,8 @@ jobs:
       MOD_VERSION: ${{ needs.versions.outputs.mod_version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG && format('refs/tags/{0}', env.RELEASE_TAG) || '' }}
 
       # 21 compiles 1.20.x and 1.21.x, 25 compiles 26.x. Both are installed so Gradle finds its
       # toolchain here instead of downloading one per job.
@@ -67,6 +102,7 @@ jobs:
         run: >-
           bash ./gradlew build --no-daemon --stacktrace
           -Porg.gradle.java.installations.fromEnv=JAVA_HOME_21_X64,JAVA_HOME_25_X64
+          "-Pmod_version=$MOD_VERSION"
           "-Pminecraft_version=${{ matrix.minecraft }}"
           "-Pyarn_mappings=${{ matrix.yarn }}"
           "-Pfabric_version=${{ matrix.fabric_api }}"
@@ -87,24 +123,14 @@ jobs:
 
   release:
     name: Release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [versions, build]
+    # Pushes and pull requests stop at the artifacts. Every version has to build before anything is
+    # attached, so a release never goes out with only some of its jars.
+    if: github.event_name == 'release' || inputs.release != ''
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    env:
-      TAG: ${{ github.ref_name }}
-      MOD_VERSION: ${{ needs.versions.outputs.mod_version }}
     steps:
-      # A tag that disagrees with gradle.properties would ship jars whose names and fabric.mod.json
-      # say a different version than the release they are attached to.
-      - name: Check the tag matches mod_version
-        run: |
-          if [ "$TAG" != "v$MOD_VERSION" ]; then
-            echo "::error::Tag $TAG does not match mod_version $MOD_VERSION in gradle.properties"
-            exit 1
-          fi
-
       - uses: actions/download-artifact@v8
         with:
           pattern: randomserverfinder-mc*
@@ -114,13 +140,48 @@ jobs:
       - name: List the jars
         run: ls -l dist
 
+      # --clobber replaces jars of the same name, so rebuilding a release needs no cleanup first.
       # Skipped when run locally with act, which should never publish anything.
-      - name: Publish the release
+      - name: Attach the jars to the release
         if: ${{ !env.ACT }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "$TAG" dist/*.jar
-          --repo "$GITHUB_REPOSITORY"
-          --title "Random Server Finder $MOD_VERSION"
-          --generate-notes
+        run: gh release upload "$RELEASE_TAG" dist/*.jar --clobber --repo "$GITHUB_REPOSITORY"
+
+  modrinth:
+    name: Modrinth ${{ matrix.minecraft }}
+    # Each jar becomes its own Modrinth version, since each one only loads on its own Minecraft
+    # version. Like the GitHub release it waits for every version to build, but the two run apart, so
+    # a problem with one never keeps the jars off the other.
+    if: github.event_name == 'release' || inputs.release != ''
+    needs: [versions, build]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.versions.outputs.matrix) }}
+    env:
+      MOD_VERSION: ${{ needs.versions.outputs.mod_version }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: randomserverfinder-mc${{ matrix.minecraft }}
+          path: dist
+
+      # token is a Modrinth personal access token with the Create versions scope, saved as the
+      # MODRINTH_TOKEN repository secret. project is the ID from the project page's more-options menu,
+      # Copy ID. Skipped when run locally with act, which should never publish anything.
+      - name: Modrinth Publish
+        if: ${{ !env.ACT }}
+        uses: cloudnode-pro/modrinth-publish@v2.5.2
+        with:
+          token: ${{ secrets.MODRINTH_TOKEN }}
+          project: YOUR_PROJECT_ID
+          version: ${{ env.MOD_VERSION }}+mc${{ matrix.minecraft }}
+          changelog: ${{ github.event.release.body }}
+          loaders: fabric
+          game-versions: ${{ matrix.minecraft }}
+          environment: client_only
+          # Fabric API, which fabric.mod.json requires.
+          dependencies: '[{"project_id": "P7dR8mSH", "dependency_type": "required"}]'
+          files: dist/randomserverfinder-${{ env.MOD_VERSION }}-mc${{ matrix.minecraft }}.jar
